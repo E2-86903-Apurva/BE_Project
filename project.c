@@ -1,455 +1,198 @@
-#include<SoftwareSerial.h>
-#include <LiquidCrystal_I2C.h>    
-LiquidCrystal_I2C lcd(0x27,16,2);
-#include <SoftwareSerial.h>
- bool newData = false;
-  unsigned long chars;
-  unsigned short sentences, failed;
-#include <TinyGPS.h>
+#include <wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <EEPROM.h>
+#include "GravityTDS.h"
 
-TinyGPS gps;
-SoftwareSerial ss(D6, D5);
+float temperature = 25, tdsValue = 0;
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
- float flat, flon;
-    unsigned long age;
+GravityTDS gravityTds;
+#define TdsSensorPin A0;
 
+// Define pins
+#define motorPin1 9
+#define motorPin2 10
+#define motorPin3 11
+#define motorPin4 12
+#define relayPin 2
 
+// Define button pins
+#define buttonPin1 3
+#define buttonPin2 4
+#define buttonPin3 5
+#define buttonPin4 6
 
-
-
-int i=0,k=0;
-
-
-
-void initModule(String cmd, char *res, int t)
-
-{
-
-  while(1)
-
-  {
-
-    Serial.println(cmd);
-
-    Serial.println(cmd);
-
-    delay(100);
-
-    while(Serial.available()>0)
-
-    {
-
-       if(Serial.find(res))
-
-       {
-
-        Serial.println(res);
-
-        delay(t);
-
-        return;
-
-       }
-
-
-       else
-
-       {
-
-        Serial.println("Error");
-
-       }
-
-    }
-
-    delay(t);
-
-  }
-
-}
-
-
+// define variables to store analog value
+int buttonvalue1;
+int buttonvalue2;
+int buttonvalue3;
+int buttonvalue4;
 
 void setup()
-
 {
-     lcd.init();      
-   lcd.backlight();
-pinMode(A0,INPUT_PULLUP);
-  Serial.begin(9600);
- ss.begin(9600);
-  Serial.begin(9600);
-
-  //lcd.begin(16,2);  
-
-  lcd.print("Women Safety  ");
-
-  lcd.setCursor(0,1);
-
-  lcd.print("     System     ");
-
-  delay(2000);
-
-  lcd.clear();
-
-  lcd.print("Initializing");
-
-  lcd.setCursor(0,1);
-
-  lcd.print("Please Wait...");
-
-  delay(1000);
-
- 
-
-  Serial.println("Initializing....");
-
-  initModule("AT","OK",1000);
-
-  initModule("ATE1","OK",1000);
-
-  initModule("AT+CPIN?","READY",1000);  
-
-  initModule("AT+CMGF=1","OK",1000);    
-
-  initModule("AT+CNMI=2,2,0,0,0","OK",1000);  
-
-  Serial.println("Initialized Successfully");
-
-  lcd.clear();
-
-  lcd.print("Initialized");
-
-  lcd.setCursor(0,1);
-
-  lcd.print("Successfully");
-
-  delay(2000);
-
-  lcd.clear();
-
- 
-
-  delay(1000);
-
- 
-
-  lcd.clear();
-
-  lcd.print("Waiting For GPS");
-
-  lcd.setCursor(0,1);
-
-  lcd.print("     Signal    ");
-
-  delay(2000);
-
-
-  get_gps();
-
-  delay(2000);
-
-  lcd.clear();
-
-  lcd.print("GPS is Ready");
-
-  delay(1000);
-
-  lcd.clear();
-
-  lcd.print("System Ready");
-
-  Serial.println("System Ready..");
-
+    // initialize serial communication
+    Serial.begin(9600);
 }
 
+// Initialize motor pins as outputs
+pinMode(motorPin1, OUTPUT);
+pinMode(motorPin2, OUTPUT);
+pinMode(motorPin3, OUTPUT);
+pinMode(motorPin4, OUTPUT);
+
+// inialize relay pin as output
+pinMode(relayPin, OUTPUT);
+
+// Initialize button pins as inputs
+pinMode(buttonPin1, INPUT);
+pinMode(buttonPin2, INPUT);
+pinMode(buttonPin3, INPUT);
+pinMode(buttonPin4, INPUT);
+
+// Inialize the LCD
+lcd.begin();
+lcd.backlight();
+
+// Start serial communication
+Serial.begin(9600);
+
+// Initialize the TDS sensor
+gravityTds.setPins(TdsSensorPin);
+gravityTds.serAdcRange(1024);
+gravityTds.begin();
+}
 
 void loop()
-
 {
+    buttonvalue1 = digitalRead(buttonPin1);
+    buttonvalue2 = digitalRead(buttonPin2);
+    buttonvalue3 = digitalRead(buttonPin3);
+    buttonvalue4 = digitalRead(buttonPin4);
+}
 
-    int value1=analogRead(A0);
-   
+// print analog values to serial monitor
+Serial.print("B1: ");
+Serial.print(buttonvalue1);
+Serial.print("B2: ");
+Serial.print(buttonvalue2);
+Serial.print("B3: ");
+Serial.print(buttonvalue3);
+Serial.print("B4: ");
+Serial.print(buttonvalue4);
 
-    Serial.print("x=");
+// process analog values and control motor accordingly
+digitalWrite(motorPin1, HIGH);
 
-    Serial.println(value1);
+digitalWrite(motorPin2, LOW);
 
-   
+digitalWrite(motorPin3, HIGH);
 
-    if(value1>650)
+digitalWrite(motorPin4, LOW);
 
-    {
+// Turn on forward relay
 
-     get_gps();
+digitalWrite(relayPin, HIGH);
 
- 
+} else if (buttonvalue2 <=0) {
 
-      lcd.clear();
+// Move reverse
 
-      lcd.print("Sending SMS ");
+digitalWrite(motorPin1, LOW);
 
-      Serial.println("Sending SMS");
+digitalWrite(motorPin2, HIGH);
 
-      Send1();
-      delay(1000);
-      Send2();
-     delay(1000);
-     Send3();
-     
- lcd.clear();
-      Serial.println("SMS Sent");
-       lcd.print("SMS Sent");
-      delay(2000);
+digitalWrite(motorPin3, LOW);
 
-      lcd.clear();
+digitalWrite(motorPin4, HIGH);
 
-      lcd.print("System Ready");
+// Turn off relay
 
-    }      
+digitalWrite(relayPin, LOW);
+
+} else if (buttonvalue3 <=0) {
+
+// Turn right
+
+digitalWrite(motorPin1, LOW);
+
+digitalWrite(motorPin2, HIGH);
+
+digitalWrite(motorPin3, HIGH);
+
+digitalWrite(motorPin4, LOW);
+
+// Turn on right relay
+
+digitalWrite(relayPin, HIGH);
+
+} else if (buttonvalue4 <=0) {
+
+// Turn left
+
+digitalWrite(motorPin1, HIGH);
+
+digitalWrite(motorPin2, LOW);
+
+digitalWrite(motorPin3, LOW);
+
+digitalWrite(motorPin4, HIGH);
+
+// Turn on left 
+
+digitalWrite(relayPin, HIGH);
+
+} else {
+
+// Stop
+
+digitalWrite(motorPin1, LOW);
+
+digitalWrite(motorPin2, LOW);
+
+digitalWrite(motorPin3, LOW);
+
+digitalWrite(motorPin4, LOW);
+
+// Turn off all relays
+
+digitalWrite(relayPin, LOW);
 
 }
 
-
-
-void get_gps()
-
-{
-
- for (unsigned long start = millis(); millis() - start < 1000;)
-  {
-    while (ss.available())
-    {
-      char c = ss.read();
-      // Serial.write(c); // uncomment this line if you want to see the GPS data flowing
-      if (gps.encode(c)) // Did a new valid sentence come in?
-        newData = true;
-    }
-  }
-
-  if (newData)
-  {
- 
-    gps.f_get_position(&flat, &flon, &age);
-    Serial.print("LAT=");
-    Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat, 6);
-    Serial.print(" LON=");
-    Serial.print(flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon, 6);
-    Serial.print(" SAT=");
-    Serial.print(gps.satellites() == TinyGPS::GPS_INVALID_SATELLITES ? 0 : gps.satellites());
-    Serial.print(" PREC=");
-    Serial.print(gps.hdop() == TinyGPS::GPS_INVALID_HDOP ? 0 : gps.hdop());
-  }
-}
-
-
-
-
-void Send1()
-
-{
-  get_gps();
-   Serial.println("AT");
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.println("AT+CMGF=1");
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("AT+CMGS=");
-
-   Serial.print('"');
-
-   Serial.print("+919830798713");    //mobile no. for SMS alert
-
-   Serial.println('"');
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("Latitude:");
-
-   Serial.println(flat,6);
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print(" longitude:");
-
-   Serial.println(flon,6);
-
-   delay(500);
-
-   serialPrint();
-
-Serial.println("I am in Trouble");
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=");
-
-   Serial.print(flat,6);
-
-   Serial.print('+');              //28.612953, 77.231545   //28.612953,77.2293563
-
-   Serial.println(flon,6);
- //  Serial.println(" ");
-
-   Serial.write(26);
-
-   delay(2000);
-
-   serialPrint();
+delay(100);
 
 }
-void Send2()
+
+Void sensor()
 
 {
-  get_gps();
-   Serial.println("AT");
 
-   delay(500);
+//temperature = read Temperature(); //add your tempera
 
-   serialPrint();
+gravityTds.setTemperature (temperature); // set the
 
-   Serial.println("AT+CMGF=1");
+gravityTds.update(); //sample and calculate
 
-   delay(500);
+tdsValue = gravityTds.getTdsValue(); // then get t
 
-   serialPrint();
+Serial.print(tdsValue,0);
 
-   Serial.print("AT+CMGS=");
+Serial.println("ppm");
 
-   Serial.print('"');
+// delay(1000);
 
-   Serial.print("+918830870036");    //mobile no. for SMS alert
+// Display TDS value on the LCD
 
-   Serial.println('"');
+lcd.clear();
 
-   delay(500);
+lcd.setCursor(0, 0);
 
-   serialPrint();
+1cd.print("TDS Value : ");
 
-   Serial.print("Latitude:");
+lcd.setCursor(0, 1);
 
-   Serial.println(flat,6);
+lcd.print(tdsValue);
 
-   delay(500);
+delay(500); // Adjust delay as needed
 
-   serialPrint();
-
-   Serial.print(" longitude:");
-
-   Serial.println(flon,6);
-
-   delay(500);
-
-   serialPrint();
-
-Serial.println("I am in Trouble");
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=");
-
-   Serial.print(flat,6);
-
-   Serial.print('+');              //28.612953, 77.231545   //28.612953,77.2293563
-
-   Serial.println(flon,6);
- //  Serial.println(" ");
-
-   Serial.write(26);
-
-   delay(2000);
-
-   serialPrint();
-
-}
-void Send3()
-
-{
-  get_gps();
-   Serial.println("AT");
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.println("AT+CMGF=1");
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("AT+CMGS=");
-
-   Serial.print('"');
-
-   Serial.print("+918208299455");    //mobile no. for SMS alert
-
-   Serial.println('"');
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("Latitude:");
-
-   Serial.println(flat,6);
-
-   delay(500);
-
-   serialPrint();
-
-   Serial.print(" longitude:");
-
-   Serial.println(flon,6);
-
-   delay(500);
-
-   serialPrint();
-
-Serial.println("I am in Trouble");
-   delay(500);
-
-   serialPrint();
-
-   Serial.print("http://maps.google.com/maps?&z=15&mrt=yp&t=k&q=");
-
-   Serial.print(flat,6);
-
-   Serial.print('+');              //28.612953, 77.231545   //28.612953,77.2293563
-
-   Serial.println(flon,6);
- //  Serial.println(" ");
-
-   Serial.write(26);
-
-   delay(2000);
-
-   serialPrint();
-
-}
-void serialPrint()
-
-{
-/*
-  while(Serial.available()>0)
-
-  {
-
-    Serial.print(Serial.read());
-
-  }
-*/
 }
